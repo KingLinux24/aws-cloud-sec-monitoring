@@ -18,7 +18,7 @@ The system establishes a secure API gateway boundary backed by identity verifica
                     [ Client / Attacker ]
                             │
                             ▼
-[ Amazon API Gateway ] ◄─── (JWT Authorizer via Amazon Cognito)
+                    [ Amazon API Gateway ] ◄─── (JWT Authorizer via Amazon Cognito)
                             │
                        ┌────┴────────────────────────┐
                        │                             │
