@@ -15,17 +15,17 @@ The system establishes a secure API gateway boundary backed by identity verifica
 * **Threat Telemetry & Auditing:** Real-time AWS CloudWatch Log Streams tracking authorization failures (401/403) and valid execution traces.
 
 ```
-[ Client / Attacker ]
-│
-▼
+                    [ Client / Attacker ]
+                            │
+                            ▼
 [ Amazon API Gateway ] ◄─── (JWT Authorizer via Amazon Cognito)
-│
-┌────┴────────────────────────┐
-│                             │
-(401/403 Rejected)       (200 Authorized)
-│                             │
-▼                             ▼
-[ CloudWatch Logs ]       [ AWS Lambda Engine ] ──► [ Encrypted S3 ]
+                            │
+                       ┌────┴────────────────────────┐
+                       │                             │
+                    (401/403 Rejected)       (200 Authorized)
+                       │                             │
+                       ▼                             ▼
+                [ CloudWatch Logs ]       [ AWS Lambda Engine ] ──► [ Encrypted S3 ]
 ```
 
 ---
