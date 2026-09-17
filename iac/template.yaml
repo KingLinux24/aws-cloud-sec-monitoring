@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS Cloud Security Monitoring & Detection Engine
+
+Resources:
+  # 1. Secure Storage Bucket (Enforcing Encryption & TLS)
+  SecDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Hard Bucket Policy restricting insecure (non-HTTPS) transport
+  SecBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SecDataBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTLSRequestsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: 
+              - !Sub "${SecDataBucket.Arn}"
+              - !Sub "${SecDataBucket.Arn}/*"
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # 2. Cognito Authentication Infrastructure
+  SecUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: SecAppUserPool
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+
+  SecUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: SecAppClient
+      UserPoolId: !Ref SecUserPool
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
+  # 3. Protected API Gateway Layer
+  SecApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt SecUserPool.Arn
+
+  # 4. Core Business Logic Function (Attached to pre-created LabRole)
+  CoreDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../src/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Events:
+        GetData:
+          Type: Api
+          Properties:
+            Path: /data
+            Method: get
+            RestApiId: !Ref SecApiGateway
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub "https://${SecApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/data"
+  UserPoolId:
+    Value: !Ref SecUserPool
+  UserPoolClientId:
+    Value: !Ref SecUserPoolClient
